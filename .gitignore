@@ -1,0 +1,4 @@
+*.tar
+ImageJournal.md
+docker-compose*.yml
+qnap.docker.*.txt
