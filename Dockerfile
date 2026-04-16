@@ -35,19 +35,17 @@ LABEL org.opencontainers.image.created="${BUILD_DATE}"
 LABEL org.opencontainers.image.url="https://roon.app"
 LABEL org.opencontainers.image.licenses="Proprietary"
 
-ENV ROON_DATAROOT=/Roon/data
-ENV ROON_ID_DIR=/Roon/data
-
 # Runtime dependencies:
 #   curl            — downloads RoonServer on first run
 #   bzip2           — extracts the .tar.bz2 tarball
+#   tzdata          — IANA timezone data for TZ environment variable
 #   libicu76        — .NET globalization (Debian Trixie specific)
 #   libasound2t64   — ALSA audio, required by libraatmanager.so
 #   cifs-utils      — SMB/CIFS network share mounting
 #   ca-certificates — HTTPS for streaming services and cloud APIs
 RUN apt-get update \
     && apt-get -y install --no-install-recommends \
-       bash curl bzip2 libicu76 libasound2t64 cifs-utils ca-certificates \
+       bash curl bzip2 tzdata libicu76 libasound2t64 cifs-utils ca-certificates \
     && (chmod u-s /usr/sbin/mount.cifs 2>/dev/null || true) \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /var/log/apt /var/log/dpkg.log \
@@ -67,9 +65,7 @@ EXPOSE 9003/udp 9100-9200/tcp 9200-9250/tcp 9330-9339/tcp 55000/tcp
 HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
     CMD grep -ql '[R]oonServer.dll' /proc/[0-9]*/cmdline 2>/dev/null || exit 1
 
-STOPSIGNAL SIGTERM
-
 # entrypoint.sh downloads RoonServer on first run (to /Roon/app), then
 # exec's into start.sh — the stock bash launcher that handles
-# .NET runtime discovery, ulimit, self-update swap, and restart (exit 122).
+# .NET runtime discovery, ulimit, self-update swap, and restart.
 ENTRYPOINT ["/entrypoint.sh"]

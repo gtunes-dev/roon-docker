@@ -18,9 +18,7 @@ On first start, the container downloads and installs RoonServer automatically. S
 
 - **Linux host** (amd64 / x86_64) — NAS devices (Synology, QNAP, Unraid, TrueNAS) work well
 - **Host networking** (`--net=host`) — required for Roon's multicast device discovery
-- **Restart policy** (`--restart unless-stopped`) — Roon exits with code 122 to request restarts
-- **Init process** (`--init`) — ensures clean signal handling and zombie process reaping
-- **Stop timeout** (`--stop-timeout 45`) — gives Roon time to flush its database on shutdown
+- **Restart policy** (`--restart unless-stopped`) — ensures the container restarts after unexpected exits
 
 Docker Desktop for macOS and Windows does not support multicast and will not work for production use.
 
@@ -37,50 +35,40 @@ Set the `TZ` environment variable to your [timezone](https://en.wikipedia.org/wi
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `TZ` | `UTC` | Timezone for logs and schedules |
-| `ROON_DATAROOT` | `/Roon/data` | Data directory (set in image, don't change) |
-| `ROON_ID_DIR` | `/Roon/data` | Identity directory (set in image, don't change) |
-| `ROON_CHANNEL` | `production` | Release channel: `production` or `earlyaccess` |
-| `ROON_DOWNLOAD_URL` | *(default CDN)* | Override the RoonServer download URL |
+| `ROON_INSTALL_BRANCH` | `production` | Release channel: `production` or `earlyaccess` |
+| `ROON_DOWNLOAD_URL` | *(from Roon servers)* | Override the RoonServer download URL |
 
 ## Volumes
 
-All Roon state lives under a single `/Roon` mount:
+| Mount | Purpose |
+|-------|---------|
+| `/Roon` | RoonServer state — database, settings, identity, and application binaries. Must be writable and persistent. |
+| `/RoonBackup` | Roon backup destination (optional). Configure in Settings > Backups. |
+| `/music` | Your music library (read-only) |
 
-| Path | Purpose |
-|------|---------|
-| `/Roon/data` | Database, settings, cache, and identity |
-| `/Roon/backup` | Roon backup destination |
-| `/Roon/app` | Downloaded RoonServer binaries |
-| `/music` | Your music library (mounted read-only) |
-
-```bash
--v /Roon:/Roon \
--v /Music:/music:ro
-```
-
-**The `/Roon/data` directory is critical.** If this volume is lost:
+**The `/Roon` volume is critical.** If this volume is lost:
 
 - Your Roon data and settings are lost unless they can be restored from a Roon backup
 - The server will appear as a new machine and must be re-authorized from a Roon remote
 
-Always back up your `/Roon` volume. We recommend using Roon's built-in backup feature in Settings > Backups, with `/Roon/backup` as the backup destination
+We recommend using Roon's built-in backup feature (Settings > Backups) pointed at `/RoonBackup`.
 
 ## Updating
 
-RoonServer updates itself automatically. When an update is available, the container will download and apply it — no action needed.
+When an update is available, RoonServer will download and install it automatically. A restart is required to apply the update, which can be triggered from a Roon remote. The Docker image plays no role in the update process.
 
-Updates persist across `docker stop` / `docker start`. If you recreate the container (`docker rm` + `docker run`), RoonServer will be re-downloaded from the configured release channel on first start.
+All RoonServer state and binaries are persisted to the `/Roon` volume. Recreating the container (`docker rm` + `docker run`) does not trigger a re-download.
 
 ## Release Channel
 
 RoonServer has two release channels:
 
-| Channel | `ROON_CHANNEL` | Community |
+| Channel | `ROON_INSTALL_BRANCH` | Community |
 |---------|----------------|-----------|
 | **Production** | `production` (default) | [Roon](https://community.roonlabs.com/c/roon/8) |
 | **Early Access** | `earlyaccess` | [Early Access](https://community.roonlabs.com/c/early-access/120) |
 
-Set `ROON_CHANNEL` to change the channel. The channel determines which version of RoonServer is downloaded on first start, and Roon's self-updater continues on the same channel automatically.
+Set `ROON_INSTALL_BRANCH` to change the channel. The channel determines which version of RoonServer is downloaded on first start, and Roon's self-updater continues on the same channel automatically.
 
 Changing channels on an existing install is safe — the container removes the old binaries and downloads from the new channel. Your data, settings, and identity are preserved.
 
@@ -94,7 +82,7 @@ Changing channels on an existing install is safe — the container removes the o
 
 **First start is slow** — RoonServer (~200MB) is downloaded on first run. Subsequent starts are instant.
 
-**Logs** — `docker logs roonserver` or inside the volume at `/Roon/data/RoonServer/Logs/`.
+**Logs** — `docker logs roonserver` or inside the volume at `/Roon/database/RoonServer/Logs/`.
 
 ## License
 

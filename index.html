@@ -114,8 +114,11 @@
       <div class="lg:col-span-5 space-y-5">
 
         <!-- Platform Selector -->
-        <section class="bg-surface-800/60 border border-surface-500/40 rounded-xl p-5 backdrop-blur-sm">
-          <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-200 mb-3">Platform</h3>
+        <section class="bg-surface-800/60 border border-surface-500/40 rounded-xl p-5 backdrop-blur-sm ring-1 ring-roon-400/40">
+          <div class="flex items-center gap-2 mb-3">
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-200">Platform</h3>
+            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-500/15 text-amber-400 ring-1 ring-amber-500/20">Select your platform</span>
+          </div>
           <label for="platform-select" class="sr-only">Select your platform</label>
           <select id="platform-select"
                   class="w-full px-3 py-2 bg-surface-700 border border-surface-500/50 rounded-lg text-sm text-slate-200 focus:border-roon-400 focus:ring-1 focus:ring-roon-400 transition-colors duration-200 outline-none appearance-none"
@@ -160,7 +163,7 @@
           <div class="space-y-4">
             <div>
               <label class="text-sm font-medium text-white" for="vol-roon">/Roon</label>
-              <p class="text-xs text-surface-300 mt-0.5 mb-2" id="vol-roon-desc">Database, settings, cache, backups, and machine identity. Must be writable and persistent.</p>
+              <p class="text-xs text-surface-300 mt-0.5 mb-2" id="vol-roon-desc">Database, settings, cache, and machine identity. Must be writable and persistent.</p>
               <input type="text" id="vol-roon" value="/opt/roon" aria-describedby="vol-roon-desc"
                      class="w-full px-3 py-2 bg-surface-700 border border-surface-500/50 rounded-lg text-sm font-mono text-slate-200 focus:border-roon-400 focus:ring-1 focus:ring-roon-400 transition-colors duration-200 outline-none">
             </div>
@@ -168,6 +171,12 @@
               <label class="text-sm font-medium text-white" for="vol-music">/music</label>
               <p class="text-xs text-surface-300 mt-0.5 mb-2" id="vol-music-desc">Your music library. Can be read-only.</p>
               <input type="text" id="vol-music" value="/mnt/music" aria-describedby="vol-music-desc"
+                     class="w-full px-3 py-2 bg-surface-700 border border-surface-500/50 rounded-lg text-sm font-mono text-slate-200 focus:border-roon-400 focus:ring-1 focus:ring-roon-400 transition-colors duration-200 outline-none">
+            </div>
+            <div class="border-t border-surface-500/30 pt-4">
+              <label class="text-sm font-medium text-white" for="vol-backup">/RoonBackup</label>
+              <p class="text-xs text-surface-300 mt-0.5 mb-2" id="vol-backup-desc">Roon backup destination. Configure in Settings > Backups. Optional.</p>
+              <input type="text" id="vol-backup" value="/RoonBackup" aria-describedby="vol-backup-desc"
                      class="w-full px-3 py-2 bg-surface-700 border border-surface-500/50 rounded-lg text-sm font-mono text-slate-200 focus:border-roon-400 focus:ring-1 focus:ring-roon-400 transition-colors duration-200 outline-none">
             </div>
 
@@ -220,23 +229,6 @@
                     <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-500/15 text-amber-400 ring-1 ring-amber-500/20">Recommended</span>
                   </div>
                   <p class="text-xs text-surface-300 mt-0.5">Prevents unbounded Docker log growth. Uses Docker's local log driver with automatic rotation.</p>
-                </div>
-              </div>
-            </div>
-
-            <!-- Grace period -->
-            <div class="py-3 border-b border-surface-500/30">
-              <div class="flex items-start gap-3">
-                <label class="relative inline-flex items-center cursor-pointer mt-0.5 flex-shrink-0">
-                  <input type="checkbox" id="opt-grace" class="sr-only peer" checked>
-                  <div class="toggle-track"></div>
-                </label>
-                <div class="flex-1 min-w-0">
-                  <div class="flex items-center gap-2 flex-wrap">
-                    <label class="text-sm font-medium text-white cursor-pointer" for="opt-grace">Stop grace period (45s)</label>
-                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-500/15 text-amber-400 ring-1 ring-amber-500/20">Recommended</span>
-                  </div>
-                  <p class="text-xs text-surface-300 mt-0.5">Give Roon time to flush the database on shutdown. Default Docker timeout is 10s which may not be enough.</p>
                 </div>
               </div>
             </div>
@@ -384,12 +376,12 @@
   var currentTab = 'compose';
 
   var platforms = {
-    linux:    { roon: '/opt/roon', music: '/mnt/music', hint: 'Paths set to standard Linux conventions.' },
-    synology: { roon: '/volume1/docker/roon', music: '/volume1/music', hint: 'Paths set for Synology DSM. Adjust volume1 if needed.' },
-    qnap:    { roon: '/share/Roon', music: '/share/Music', hint: 'Paths set for QNAP. Shared folders live under /share/.' },
-    unraid:  { roon: '/mnt/user/appdata/roon', music: '/mnt/user/Music', hint: 'Paths set for Unraid. Consider /mnt/cache/ for the Roon folder.' },
-    truenas: { roon: '/mnt/tank/apps/roon', music: '/mnt/tank/media/music', hint: 'Paths set for TrueNAS SCALE. Adjust pool name if needed.' },
-    custom:  { roon: '/Roon', music: '/music', hint: 'Enter your own paths.' },
+    linux:    { roon: '/opt/roon', music: '/mnt/music', backup: '/RoonBackup', hint: 'Paths set to standard Linux conventions.' },
+    synology: { roon: '/volume1/docker/roon', music: '/volume1/music', backup: '/RoonBackup', hint: 'Paths set for Synology DSM. Adjust volume1 if needed.' },
+    qnap:    { roon: '/share/Roon', music: '/share/Music', backup: '/RoonBackup', hint: 'Paths set for QNAP. Shared folders live under /share/.' },
+    unraid:  { roon: '/mnt/user/appdata/roon', music: '/mnt/user/Music', backup: '/RoonBackup', hint: 'Paths set for Unraid. Consider /mnt/cache/ for the Roon folder.' },
+    truenas: { roon: '/mnt/tank/apps/roon', music: '/mnt/tank/media/music', backup: '/RoonBackup', hint: 'Paths set for TrueNAS SCALE. Adjust pool name if needed.' },
+    custom:  { roon: '/Roon', music: '/music', backup: '/RoonBackup', hint: 'Enter your own paths.' },
   };
 
   // --- DOM references ---
@@ -427,11 +419,11 @@
       channel: getVal('channel-select') || 'production',
       volRoon: getVal('vol-roon') || '/Roon',
       volMusic: getVal('vol-music') || '/music',
+      volBackup: getVal('vol-backup') || '/RoonBackup',
       extraVolumes: extras,
       tz: isChecked('opt-tz'),
       tzValue: getVal('tz-value'),
       logging: isChecked('opt-logging'),
-      grace: isChecked('opt-grace'),
       cifs: isChecked('opt-cifs'),
       usbAudio: isChecked('opt-usb-audio'),
       hdmiAudio: isChecked('opt-hdmi-audio'),
@@ -446,10 +438,9 @@
     lines.push('    image: ' + cfg.image);
     lines.push('    container_name: roonserver');
     lines.push('    network_mode: host');
-    lines.push('    init: true');
 
     var envVars = [];
-    if (cfg.channel === 'earlyaccess') envVars.push('ROON_CHANNEL=earlyaccess');
+    if (cfg.channel === 'earlyaccess') envVars.push('ROON_INSTALL_BRANCH=earlyaccess');
     if (cfg.tz) envVars.push('TZ=' + cfg.tzValue);
     if (envVars.length) {
       lines.push('    environment:');
@@ -459,15 +450,12 @@
     lines.push('    volumes:');
     lines.push('      - ' + cfg.volRoon + ':/Roon');
     lines.push('      - ' + cfg.volMusic + ':/music:ro');
+    lines.push('      - ' + cfg.volBackup + ':/RoonBackup');
     cfg.extraVolumes.forEach(function(v) {
       lines.push('      - ' + v.host + ':' + v.container);
     });
     if (cfg.usbAudio) {
       lines.push('      - /run/udev:/run/udev:ro');
-    }
-
-    if (cfg.grace) {
-      lines.push('    stop_grace_period: 45s');
     }
 
     lines.push('    restart: unless-stopped');
@@ -506,10 +494,9 @@
     var parts = ['docker run -d \\'];
     parts.push('  --name roonserver \\');
     parts.push('  --network host \\');
-    parts.push('  --init \\');
 
     if (cfg.channel === 'earlyaccess') {
-      parts.push('  -e ROON_CHANNEL=earlyaccess \\');
+      parts.push('  -e ROON_INSTALL_BRANCH=earlyaccess \\');
     }
     if (cfg.tz) {
       parts.push('  -e TZ=' + cfg.tzValue + ' \\');
@@ -517,17 +504,16 @@
 
     parts.push('  -v ' + cfg.volRoon + ':/Roon \\');
     parts.push('  -v ' + cfg.volMusic + ':/music:ro \\');
+    parts.push('  -v ' + cfg.volBackup + ':/RoonBackup \\');
     cfg.extraVolumes.forEach(function(v) {
       parts.push('  -v ' + v.host + ':' + v.container + ' \\');
     });
 
-    if (cfg.grace) {
-      parts.push('  --stop-timeout 45 \\');
+    if (cfg.logging) {
+      parts.push('  --log-driver local \\');
     }
 
     parts.push('  --restart unless-stopped \\');
-
-
 
     if (cfg.cifs) {
       parts.push('  --cap-add SYS_ADMIN \\');
@@ -548,15 +534,7 @@
       parts.push('  --group-add audio \\');
     }
 
-    if (cfg.logging) {
-      parts.push('  --log-driver local \\');
-    }
-
-    // Remove trailing backslash from last option line
-    var lastIdx = parts.length - 1;
-    parts[lastIdx] = parts[lastIdx].replace(/ \\$/, '');
-
-    // Image as final line
+    // Image as final line (no trailing backslash)
     parts.push('  ' + cfg.image);
 
     return parts;
@@ -787,6 +765,7 @@
     if (!p) return;
     setVal('vol-roon', p.roon);
     setVal('vol-music', p.music);
+    setVal('vol-backup', p.backup);
     elPlatformHint.textContent = p.hint;
     generate();
   }
@@ -924,7 +903,7 @@
   elBtnCopy.addEventListener('click', copyToClipboard);
   elBtnDownload.addEventListener('click', downloadFile);
 
-  ['vol-roon', 'vol-music'].forEach(function(id) {
+  ['vol-roon', 'vol-music', 'vol-backup'].forEach(function(id) {
     document.getElementById(id).addEventListener('input', generate);
   });
 
@@ -936,7 +915,7 @@
     generate();
   });
 
-  ['opt-tz', 'opt-logging', 'opt-grace', 'opt-cifs', 'opt-usb-audio', 'opt-hdmi-audio'].forEach(function(id) {
+  ['opt-tz', 'opt-logging', 'opt-cifs', 'opt-usb-audio', 'opt-hdmi-audio'].forEach(function(id) {
     document.getElementById(id).addEventListener('change', generate);
   });
 
