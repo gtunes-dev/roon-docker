@@ -31,6 +31,26 @@ wait_for_install() {
     done
 }
 
+# Poll `docker logs` until $pattern appears, or $timeout seconds elapse.
+# Returns 0 on match, non-zero on timeout (with a diagnostic tail to stderr).
+# Usage: wait_for_log <container> <pattern> [timeout_seconds]
+wait_for_log() {
+    local container="$1"
+    local pattern="$2"
+    local timeout="${3:-30}"
+    local elapsed=0
+    while ! docker logs "$container" 2>&1 | grep -qE "$pattern"; do
+        if [ "$elapsed" -ge "$timeout" ]; then
+            echo "    wait_for_log: timed out after ${timeout}s waiting for /$pattern/" >&2
+            echo "    --- last 10 log lines ---" >&2
+            docker logs --tail 10 "$container" >&2 2>&1 || true
+            return 1
+        fi
+        sleep 1
+        elapsed=$((elapsed + 1))
+    done
+}
+
 # ─── Production branch ────────────────────────────────────────
 
 echo "=== Runtime tests (production): $IMAGE ==="
@@ -67,7 +87,7 @@ check "RoonDotnet runtime exists" \
     test -d "$ROON_DIR/app/RoonServer/RoonDotnet"
 
 
-sleep 5
+wait_for_log "$CONTAINER" "^Branch: production"
 docker logs "$CONTAINER" > "$ROON_DIR/container.log" 2>&1 || true
 
 check "logs contain image version" \
@@ -112,7 +132,7 @@ check "fresh EA: VERSION file created" \
 check "fresh EA: VERSION last line is earlyaccess" \
     sh -c '[ "$(tail -1 "$1")" = "earlyaccess" ]' _ "$ROON_DIR/app/RoonServer/VERSION"
 
-sleep 3
+wait_for_log "$CONTAINER" "^Branch: earlyaccess"
 docker logs "$CONTAINER" > "$ROON_DIR/ea-fresh.log" 2>&1 || true
 
 check "fresh EA: logs show earlyaccess branch" \
@@ -160,7 +180,7 @@ while ! tail -1 "$ROON_DIR/app/RoonServer/VERSION" 2>/dev/null | grep -q "earlya
     echo "    ... ${ELAPSED}s"
 done
 
-sleep 3
+wait_for_log "$CONTAINER" "^Branch: earlyaccess"
 docker logs "$CONTAINER" > "$ROON_DIR/switch.log" 2>&1 || true
 
 check "logs show branch change detected" \
@@ -206,9 +226,7 @@ docker run -d --name "$CONTAINER" \
     -v "$ROON_DIR:/Roon" \
     "$IMAGE"
 
-# Give it a few seconds to start
-sleep 5
-
+wait_for_log "$CONTAINER" "^Branch: production"
 docker logs "$CONTAINER" > "$ROON_DIR/restart.log" 2>&1 || true
 
 check "restart does not re-download" \
@@ -226,8 +244,7 @@ docker run -d --name "$CONTAINER" \
     -e ROON_INSTALL_BRANCH=production \
     "$IMAGE"
 
-sleep 5
-
+wait_for_log "$CONTAINER" "^Branch: production"
 docker logs "$CONTAINER" > "$ROON_DIR/explicit.log" 2>&1 || true
 
 check "explicit production on existing production skips download" \
@@ -260,8 +277,7 @@ docker run -d --name "$CONTAINER" \
     -v "$ROON_DIR:/Roon" \
     "$IMAGE"
 
-sleep 5
-
+wait_for_log "$CONTAINER" "^Branch: production"
 docker logs "$CONTAINER" > "$ROON_DIR/upgrade.log" 2>&1 || true
 
 check "unset ROON_INSTALL_BRANCH keeps existing install" \
