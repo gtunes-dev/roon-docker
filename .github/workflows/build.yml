@@ -16,7 +16,7 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: roonlabs/roonserver
+  IMAGE_NAME: gtunes-dev/roonserver
 
 jobs:
   build:

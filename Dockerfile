@@ -1,17 +1,17 @@
 # syntax=docker/dockerfile:1
 
-FROM --platform=linux/amd64 debian:trixie-slim
+FROM --platform=linux/amd64 photon:5.0
 
 ARG VERSION=dev
 ARG GIT_SHA=unknown
 ARG BUILD_DATE=unknown
 
 LABEL org.opencontainers.image.title="RoonServer"
-LABEL org.opencontainers.image.authors="Roon Labs"
-LABEL org.opencontainers.image.vendor="Roon Labs"
+LABEL org.opencontainers.image.authors="gTunesDev"
+LABEL org.opencontainers.image.vendor="gTunesDev"
 LABEL org.opencontainers.image.version="${VERSION}"
-LABEL org.opencontainers.image.description="Official RoonServer Docker Image"
-LABEL org.opencontainers.image.source="https://github.com/RoonLabs/roon-docker"
+LABEL org.opencontainers.image.description="RoonServer Docker image — PhotonOS base. Personal fork of RoonLabs/roon-docker."
+LABEL org.opencontainers.image.source="https://github.com/gtunes-dev/roon-docker"
 LABEL org.opencontainers.image.revision="${GIT_SHA}"
 LABEL org.opencontainers.image.created="${BUILD_DATE}"
 LABEL org.opencontainers.image.url="https://roon.app"
@@ -19,19 +19,23 @@ LABEL org.opencontainers.image.licenses="Proprietary"
 
 # Runtime dependencies:
 #   curl            — downloads RoonServer on first run
+#   tar             — GNU tar; Photon's base /usr/bin/tar is a toybox symlink
+#                     that lacks --wildcards (used in the ffmpeg layer below to
+#                     extract a single binary from the archive) and
+#                     --no-same-permissions/--no-same-owner (used by
+#                     entrypoint.sh when extracting RoonServer onto NAS mounts)
 #   bzip2           — extracts the .tar.bz2 tarball
 #   tzdata          — IANA timezone data for TZ environment variable
-#   libicu76        — .NET globalization (Debian Trixie specific)
-#   libasound2t64   — ALSA audio, required by libraatmanager.so
+#   icu             — .NET globalization
+#   alsa-lib        — ALSA audio, required by libraatmanager.so
 #   cifs-utils      — SMB/CIFS network share mounting
 #   ca-certificates — HTTPS for streaming services and cloud APIs
-RUN apt-get update \
- && apt-get -y install --no-install-recommends \
-    bash curl xz-utils bzip2 tzdata libicu76 \
-    libasound2t64 cifs-utils ca-certificates \
+RUN tdnf install -y \
+    bash curl tar xz bzip2 tzdata icu \
+    alsa-lib cifs-utils ca-certificates \
  && (chmod u-s /usr/sbin/mount.cifs 2>/dev/null || true) \
- && apt-get clean \
- && rm -rf /var/lib/apt/lists/* /var/log/apt /var/log/dpkg.log \
+ && tdnf clean all \
+ && rm -rf /var/cache/tdnf /var/log/tdnf.log \
            /usr/share/doc /usr/share/man
 
 RUN curl -L -o /tmp/ffmpeg.tar.xz https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz \

@@ -48,8 +48,8 @@ check "image has source label" \
     docker inspect "$IMAGE" --format '{{ index .Config.Labels "org.opencontainers.image.source" }}'
 
 # Cleanup was effective
-check "apt lists cleaned" \
-    docker run --rm --entrypoint sh "$IMAGE" -c '[ -z "$(ls /var/lib/apt/lists/)" ]'
+check "tdnf cache cleaned" \
+    docker run --rm --entrypoint sh "$IMAGE" -c '[ ! -d /var/cache/tdnf ] || [ -z "$(ls /var/cache/tdnf)" ]'
 
 # SUID stripped from mount.cifs
 check "mount.cifs has no SUID bit" \

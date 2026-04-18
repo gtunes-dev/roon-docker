@@ -1,9 +1,9 @@
-# RoonServer Docker Image
+# RoonServer Docker Image (PhotonOS fork)
 
-Official Docker image for [RoonServer](https://roon.app).
+Personal fork of [RoonLabs/roon-docker](https://github.com/RoonLabs/roon-docker) that builds [RoonServer](https://roon.app) on a [PhotonOS](https://vmware.github.io/photon/) base instead of Debian.
 
 ```
-ghcr.io/roonlabs/roonserver
+ghcr.io/gtunes-dev/roonserver
 ```
 
 > **Note:** This image is **amd64 (x86_64) only**. ARM-based devices (Raspberry Pi, ARM NAS models like Synology J-series) are not supported.
