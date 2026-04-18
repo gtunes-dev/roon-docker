@@ -10,7 +10,7 @@ ghcr.io/gtunes-dev/roonserver
 
 ## Quick Start
 
-Use the **[Docker Setup Guide](https://roonlabs.github.io/roon-docker/)** to generate a `docker run` or `docker compose` command tailored to your system.
+Use the **[Docker Setup Guide](https://gtunes-dev.github.io/roon-docker/)** to generate a `docker run` or `docker compose` command tailored to your system (the guide is specific to this PhotonOS fork and references `ghcr.io/gtunes-dev/roonserver`).
 
 On first start, the container downloads and installs RoonServer automatically. Subsequent starts skip the download and launch immediately.
 
