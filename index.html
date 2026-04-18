@@ -168,15 +168,15 @@
                      class="w-full px-3 py-2 bg-surface-700 border border-surface-500/50 rounded-lg text-sm font-mono text-slate-200 focus:border-roon-400 focus:ring-1 focus:ring-roon-400 transition-colors duration-200 outline-none">
             </div>
             <div class="border-t border-surface-500/30 pt-4">
-              <label class="text-sm font-medium text-white" for="vol-music">/music</label>
+              <label class="text-sm font-medium text-white" for="vol-music">/Music</label>
               <p class="text-xs text-surface-300 mt-0.5 mb-2" id="vol-music-desc">Your music library. Can be read-only.</p>
               <input type="text" id="vol-music" value="/mnt/music" aria-describedby="vol-music-desc"
                      class="w-full px-3 py-2 bg-surface-700 border border-surface-500/50 rounded-lg text-sm font-mono text-slate-200 focus:border-roon-400 focus:ring-1 focus:ring-roon-400 transition-colors duration-200 outline-none">
             </div>
             <div class="border-t border-surface-500/30 pt-4">
-              <label class="text-sm font-medium text-white" for="vol-backup">/RoonBackup</label>
+              <label class="text-sm font-medium text-white" for="vol-backup">/RoonBackups</label>
               <p class="text-xs text-surface-300 mt-0.5 mb-2" id="vol-backup-desc">Roon backup destination. Configure in Settings > Backups. Optional.</p>
-              <input type="text" id="vol-backup" value="/RoonBackup" aria-describedby="vol-backup-desc"
+              <input type="text" id="vol-backup" value="/RoonBackups" aria-describedby="vol-backup-desc"
                      class="w-full px-3 py-2 bg-surface-700 border border-surface-500/50 rounded-lg text-sm font-mono text-slate-200 focus:border-roon-400 focus:ring-1 focus:ring-roon-400 transition-colors duration-200 outline-none">
             </div>
 
@@ -376,13 +376,50 @@
   var currentTab = 'compose';
 
   var platforms = {
-    linux:    { roon: '/opt/roon', music: '/mnt/music', backup: '/RoonBackup', hint: 'Paths set to standard Linux conventions.' },
-    synology: { roon: '/volume1/docker/roon', music: '/volume1/music', backup: '/RoonBackup', hint: 'Paths set for Synology DSM. Adjust volume1 if needed.' },
-    qnap:    { roon: '/share/Roon', music: '/share/Music', backup: '/RoonBackup', hint: 'Paths set for QNAP. Shared folders live under /share/.' },
-    unraid:  { roon: '/mnt/user/appdata/roon', music: '/mnt/user/Music', backup: '/RoonBackup', hint: 'Paths set for Unraid. Consider /mnt/cache/ for the Roon folder.' },
-    truenas: { roon: '/mnt/tank/apps/roon', music: '/mnt/tank/media/music', backup: '/RoonBackup', hint: 'Paths set for TrueNAS SCALE. Adjust pool name if needed.' },
-    custom:  { roon: '/Roon', music: '/music', backup: '/RoonBackup', hint: 'Enter your own paths.' },
+    linux:    { roon: '/opt/roon', music: '/mnt/music', backup: '/opt/RoonBackups', prefix: '/mnt/', hint: 'Paths set to standard Linux conventions.' },
+    synology: { roon: '/volume1/docker/roon', music: '/volume1/music', backup: '/volume1/RoonBackups', prefix: '/volume1/', hint: 'Paths set for Synology DSM. Adjust volume1 if needed.' },
+    qnap:    { roon: '/share/Roon', music: '/share/Music', backup: '/share/RoonBackups', prefix: '/share/', hint: 'Paths set for QNAP. Shared folders live under /share/.' },
+    unraid:  { roon: '/mnt/user/appdata/roon', music: '/mnt/user/Music', backup: '/mnt/user/RoonBackups', prefix: '/mnt/user/', hint: 'Paths set for Unraid. Consider /mnt/cache/ for the Roon folder.' },
+    truenas: { roon: '/mnt/tank/apps/roon', music: '/mnt/tank/media/music', backup: '/mnt/tank/backups/roon', prefix: '/mnt/tank/', hint: 'Paths set for TrueNAS SCALE. Adjust pool name if needed.' },
+    custom:  { roon: '/Roon', music: '/music', backup: '/RoonBackups', prefix: '', hint: 'Enter your own paths.' },
   };
+
+  // Per-platform validation patterns. Not every platform has a strict root, so
+  // linux/custom are absent and skip the check.
+  var platformRoots = {
+    synology: { pattern: /^\/volume\d+\//, label: 'Synology' },
+    qnap:     { pattern: /^\/share\//,     label: 'QNAP' },
+    unraid:   { pattern: /^\/mnt\//,       label: 'Unraid' },
+    truenas:  { pattern: /^\/mnt\//,       label: 'TrueNAS' },
+  };
+
+  function validatePrefix(platform, path) {
+    if (!path) return null;
+    var cfg = platformRoots[platform];
+    if (!cfg || cfg.pattern.test(path)) return null;
+    return cfg.label + ' paths typically start with ' + platforms[platform].prefix;
+  }
+
+  function currentPlatform() {
+    return document.getElementById('platform-select').value;
+  }
+
+  function updateExtraVolumeWarning(row) {
+    var hostInput = row.querySelector('.extra-vol-host');
+    var warning = row.querySelector('.extra-vol-warning');
+    if (!hostInput || !warning) return;
+    var msg = validatePrefix(currentPlatform(), hostInput.value.trim());
+    if (msg) {
+      warning.textContent = '⚠ ' + msg;
+      warning.classList.remove('hidden');
+    } else {
+      warning.classList.add('hidden');
+    }
+  }
+
+  function refreshExtraVolumeWarnings() {
+    document.querySelectorAll('.extra-vol-row').forEach(updateExtraVolumeWarning);
+  }
 
   // --- DOM references ---
   var elOutput = document.getElementById('output');
@@ -419,7 +456,7 @@
       branch: getVal('branch-select') || 'production',
       volRoon: getVal('vol-roon') || '/Roon',
       volMusic: getVal('vol-music') || '/music',
-      volBackup: getVal('vol-backup') || '/RoonBackup',
+      volBackup: getVal('vol-backup') || '/RoonBackups',
       extraVolumes: extras,
       tz: isChecked('opt-tz'),
       tzValue: getVal('tz-value'),
@@ -449,8 +486,8 @@
 
     lines.push('    volumes:');
     lines.push('      - ' + cfg.volRoon + ':/Roon');
-    lines.push('      - ' + cfg.volMusic + ':/music:ro');
-    lines.push('      - ' + cfg.volBackup + ':/RoonBackup');
+    lines.push('      - ' + cfg.volMusic + ':/Music:ro');
+    lines.push('      - ' + cfg.volBackup + ':/RoonBackups');
     cfg.extraVolumes.forEach(function(v) {
       lines.push('      - ' + v.host + ':' + v.container);
     });
@@ -503,8 +540,8 @@
     }
 
     parts.push('  -v ' + cfg.volRoon + ':/Roon \\');
-    parts.push('  -v ' + cfg.volMusic + ':/music:ro \\');
-    parts.push('  -v ' + cfg.volBackup + ':/RoonBackup \\');
+    parts.push('  -v ' + cfg.volMusic + ':/Music:ro \\');
+    parts.push('  -v ' + cfg.volBackup + ':/RoonBackups \\');
     cfg.extraVolumes.forEach(function(v) {
       parts.push('  -v ' + v.host + ':' + v.container + ' \\');
     });
@@ -824,6 +861,7 @@
   // --- Event binding ---
   document.getElementById('platform-select').addEventListener('change', function() {
     setPlatform(this.value);
+    refreshExtraVolumeWarnings();
   });
 
   // --- Extra volume management ---
@@ -875,7 +913,7 @@
     hostInput.type = 'text';
     hostInput.className = 'extra-vol-host ' + inputClass;
     hostInput.placeholder = '/host/path';
-    hostInput.addEventListener('input', generate);
+    hostInput.value = platforms[currentPlatform()].prefix;
 
     var sep = document.createElement('span');
     sep.className = 'self-center text-surface-300 text-sm flex-shrink-0';
@@ -891,11 +929,22 @@
     inputWrap.appendChild(sep);
     inputWrap.appendChild(containerInput);
 
+    var warning = document.createElement('p');
+    warning.className = 'extra-vol-warning text-xs text-amber-400 mt-1.5 hidden';
+
+    hostInput.addEventListener('input', function() {
+      updateExtraVolumeWarning(row);
+      generate();
+    });
+
     row.appendChild(label);
     row.appendChild(inputWrap);
+    row.appendChild(warning);
     extraVolContainer.appendChild(row);
 
+    updateExtraVolumeWarning(row);
     hostInput.focus();
+    hostInput.setSelectionRange(hostInput.value.length, hostInput.value.length);
   });
 
   elTabCompose.addEventListener('click', function() { setTab('compose'); });

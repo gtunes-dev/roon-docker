@@ -39,7 +39,7 @@ Set the `TZ` environment variable to your [timezone](https://en.wikipedia.org/wi
 |-------|---------|
 | `/Roon` | RoonServer state — database, settings, identity, and application binaries. Must be writable and persistent. |
 | `/Music` | Your music library, think of this like your user's Music folder Linux, macOS, or Windows -- it's the "default music folder" |
-| `/RoonBackup` | Roon backup destination (optional). Configure in Settings > Backups. |
+| `/RoonBackups` | Roon backup destination (optional). Configure in Settings > Backups. |
 
 **The `/Roon` volume is critical.** If this volume is not mounted:
 
@@ -48,7 +48,7 @@ Set the `TZ` environment variable to your [timezone](https://en.wikipedia.org/wi
 
 If your music lives in one subdirectory on your host, mount it directly using `-v /path/to/music:/Music`. If your music is spread across multiple locations on your host, mount each location under `/Music`. For example: `-v /mnt/usb1:/Music/first -v /mnt/usb2:/Music/second`.
 
-To use Roon's database backup feature, mount a volume at `/RoonBackup` and point Roon's backup location to that directory. Example: `-v /mnt/usb1/backups:/RoonBackup` and then enable backups via Settings > Backups in Roon.
+To use Roon's database backup feature, mount a volume at `/RoonBackups` and point Roon's backup location to that directory. Example: `-v /mnt/usb1/backups:/RoonBackups` and then enable backups via Settings > Backups in Roon.
 
 ## Updating
 
