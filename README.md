@@ -38,7 +38,7 @@ Set the `TZ` environment variable to your [timezone](https://en.wikipedia.org/wi
 | Mount | Purpose |
 |-------|---------|
 | `/Roon` | RoonServer state — database, settings, identity, and application binaries. Must be writable and persistent. |
-| `/Music` | Your music library, think of this like your user's Music folder Linux, macOS, or Windows -- it's the "default music folder" |
+| `/Music` | Your primary music library — treat this like your user's Music folder on Linux, macOS, or Windows. It's the "default music folder."  Music that Roon imports (e.g. CD rips, downloads) lands here. |
 | `/RoonBackups` | Roon backup destination (optional). Configure in Settings > Backups. |
 
 **The `/Roon` volume is critical.** If this volume is not mounted:
@@ -46,13 +46,37 @@ Set the `TZ` environment variable to your [timezone](https://en.wikipedia.org/wi
 - Your Roon data and settings will not persist across container restarts
 - Your Roon install must be re-authorized on each start
 
-If your music lives in one subdirectory on your host, mount it directly using `-v /path/to/music:/Music`. If your music is spread across multiple locations on your host, mount each location under `/Music`. For example: `-v /mnt/usb1:/Music/first -v /mnt/usb2:/Music/second`.
+> **⚠ NAS warning — host paths outside your platform's persistent prefix can silently be tmpfs.** Several NAS OSes run the host root filesystem in RAM and only expose persistent storage under a specific prefix — typically `/share/...` on QNAP, `/volume1/...` on Synology, `/mnt/user/...` on Unraid, `/mnt/<pool>/...` on TrueNAS SCALE. Binding a host path **outside** that prefix (e.g. `/opt/roon` on QNAP) will appear to work: Docker creates the missing directory, the container starts, Roon imports a library — and then a reboot wipes it because the directory only ever lived in RAM. Always mount under your platform's persistent prefix. The [setup generator](https://gtunes-dev.github.io/roon-docker/) flags paths that don't match the selected platform's prefix.
+
+Mount your **primary** music location directly at `/Music` (e.g. `-v /path/to/music:/Music`). Anything Roon adds to your library from within Roon — CD rips, file imports, downloads — is written here, so this should point at the folder you want to treat as your main library.
+
+If your music is spread across multiple locations on the host, mount each additional location at a named subpath under `/Music`, for example:
+
+```
+-v /path/to/primary-music:/Music
+-v /mnt/usb1:/Music/usb1
+-v /mnt/nas/flac:/Music/nas-flac
+```
+
+A few things to know about this layout:
+
+- Each extra mount appears as its own named subfolder inside `/Music`. The mount point (e.g. `usb1`) is created on the primary host folder at container start if it doesn't already exist — that's normally just an empty directory and harmless.
+- If the primary folder already contains a real subfolder with the same name as a mount point, the mount will hide it for as long as the container runs. Pick mount names that don't collide with existing folders in your primary library.
+- Additional mounts below `/Music` are read/write inside the container just like `/Music` itself. If you want an extra location to be read-only, append `:ro` (e.g. `-v /mnt/archive:/Music/archive:ro`).
 
 To use Roon's database backup feature, mount a volume at `/RoonBackups` and point Roon's backup location to that directory. Example: `-v /mnt/usb1/backups:/RoonBackups` and then enable backups via Settings > Backups in Roon.
 
 ## Updating
 
-All RoonServer state and binaries are persisted to the `/Roon` volume. Recreating the container (`docker rm` + `docker run`) does not trigger a re-download if you mount in the same folder to the `/Roon` volume.
+All RoonServer state and binaries are persisted to the `/Roon` volume. Recreating the container (`docker rm` + `docker run`) does not trigger a re-download if you mount the same folder to the `/Roon` volume.
+
+To update on demand:
+
+```
+docker pull ghcr.io/gtunes-dev/roonserver:latest
+docker rm -f roonserver
+# re-run your docker run command or: docker compose up -d
+```
 
 ## Release Branch
 
