@@ -28,11 +28,12 @@ LABEL org.opencontainers.image.licenses="Proprietary"
 #   tzdata          — IANA timezone data for TZ environment variable
 #   icu             — .NET globalization
 #   alsa-lib        — ALSA audio, required by libraatmanager.so
+#   freetype2       — provides libfreetype.so.6 soname that bundled libharfbuzz links against
 #   cifs-utils      — SMB/CIFS network share mounting
 #   ca-certificates — HTTPS for streaming services and cloud APIs
 RUN tdnf install -y \
     bash curl tar xz bzip2 tzdata icu \
-    alsa-lib cifs-utils ca-certificates \
+    alsa-lib freetype2 cifs-utils ca-certificates \
  && (chmod u-s /usr/sbin/mount.cifs 2>/dev/null || true) \
  && tdnf clean all \
  && rm -rf /var/cache/tdnf /var/log/tdnf.log \
