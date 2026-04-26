@@ -31,13 +31,21 @@ LABEL org.opencontainers.image.licenses="Proprietary"
 #   freetype2       — provides libfreetype.so.6 soname that bundled libharfbuzz links against
 #   cifs-utils      — SMB/CIFS network share mounting
 #   ca-certificates — HTTPS for streaming services and cloud APIs
+#   shadow          — usermod/groupmod to align placeholder user with PUID/PGID at runtime
+#   util-linux      — setpriv for privilege drop to PUID:PGID before exec'ing start.sh
 RUN tdnf install -y \
     bash curl tar xz bzip2 tzdata icu \
     alsa-lib freetype2 cifs-utils ca-certificates \
+    shadow util-linux \
  && (chmod u-s /usr/sbin/mount.cifs 2>/dev/null || true) \
  && tdnf clean all \
  && rm -rf /var/cache/tdnf /var/log/tdnf.log \
            /usr/share/doc /usr/share/man
+
+# Placeholder user/group for the optional PUID/PGID feature in entrypoint.sh.
+# At runtime, usermod/groupmod adjust these IDs to whatever PUID/PGID requests
+# (or this user stays unused if PUID/PGID is unset and the container runs as root).
+RUN groupadd -r roon && useradd -r -g roon -d /Roon -s /bin/bash -N roon
 
 RUN curl -L -o /tmp/ffmpeg.tar.xz https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz \
  && tar xf /tmp/ffmpeg.tar.xz --wildcards -C /tmp "ffmpeg*/ffmpeg" \
