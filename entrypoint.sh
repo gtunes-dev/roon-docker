@@ -15,7 +15,7 @@ echo "Roon Docker image ${IMAGE_VERSION} starting."
 # This image uses the PUID/PGID convention for non-root operation. The
 # Docker-native --user / user: flag is not supported because the entrypoint
 # needs to start as root in order to chown its managed subdirs and drop
-# privileges via setpriv. Forcing user: "0:0" (e.g., for TrueNAS) is fine —
+# privileges via gosu. Forcing user: "0:0" (e.g., for TrueNAS) is fine —
 # it still starts the container as root.
 #
 # Defaults (PUID=0, PGID=0) preserve the pre-PUID/PGID behavior (run as

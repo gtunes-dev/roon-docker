@@ -50,12 +50,16 @@ RUN tdnf install -y \
 
 # gosu provides clean exec-style privilege drop for the PUID/PGID feature.
 # Photon's util-linux is built without setpriv, and no Photon package ships
-# it, so we install gosu directly. Pinned by version; SHA verification could
-# be added later for tamper-evidence (HTTPS to GitHub releases is the current
-# trust anchor).
-ARG GOSU_VERSION=1.17
+# it, so we install gosu directly. Pinned by version + SHA256 — the hash
+# captures upstream state at pin time, so any future tampering with the
+# release artifact fails the build. Refresh both ARGs together when bumping;
+# the canonical hash lives in the GPG-signed SHA256SUMS attached to each
+# gosu release on GitHub.
+ARG GOSU_VERSION=1.19
+ARG GOSU_SHA256=52c8749d0142edd234e9d6bd5237dff2d81e71f43537e2f4f66f75dd4b243dd0
 RUN curl -fL -o /usr/local/bin/gosu \
         "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-amd64" \
+ && echo "${GOSU_SHA256}  /usr/local/bin/gosu" | sha256sum -c - \
  && chmod +x /usr/local/bin/gosu \
  && /usr/local/bin/gosu --version
 
