@@ -41,12 +41,19 @@ fi
 PUID="${PUID:-0}"
 PGID="${PGID:-0}"
 
-DROP_USER=""
+# Target ownership for the managed subdirs is always set. This makes
+# ownership tracking symmetric: unsetting PUID/PGID after a prior
+# non-root run cleanly reverts /Roon/app and /Roon/database back to
+# root, instead of leaving them stranded under a UID that no longer
+# matches the running process.
+TARGET_USER="${PUID}:${PGID}"
+
+DROP_PRIVS=false
 if [ "$PUID" != "0" ] || [ "$PGID" != "0" ]; then
     groupmod -o -g "$PGID" roon
     usermod  -o -u "$PUID" -g "$PGID" roon
-    DROP_USER="${PUID}:${PGID}"
-    echo "PUID/PGID set; will switch to ${DROP_USER} before launching RoonServer."
+    DROP_PRIVS=true
+    echo "PUID/PGID set; will switch to ${TARGET_USER} before launching RoonServer."
 fi
 
 # Verify /Roon is mounted and writable
@@ -158,22 +165,23 @@ if [ "$NEEDS_INSTALL" = true ]; then
     echo "RoonServer installed successfully."
 fi
 
-# When PUID/PGID is set, align ownership of the dirs we manage to the
-# requested user. Done after install so files extracted by tar in this
-# run are also captured. /Roon, /Music, and /RoonBackups themselves are
-# the user's responsibility — only /Roon/app and /Roon/database (and
-# their contents) are chown'd here.
+# Align ownership of the dirs we manage to the running user — always.
+# Done after install so files extracted by tar in this run are also
+# captured. /Roon, /Music, and /RoonBackups themselves are the user's
+# responsibility — only /Roon/app and /Roon/database (and their
+# contents) are chown'd here.
 #
 # Always recursive (no skip-if-already-correct shortcut): a self-update
 # or partial extraction can leave files with mixed ownership that a
 # top-level stat check would miss. Wall time is logged so users with
 # very large databases can see the cost in their startup logs.
-if [ -n "$DROP_USER" ]; then
-    echo "Aligning ownership of /Roon/app and /Roon/database to ${DROP_USER}..."
-    CHOWN_START=$(date +%s)
-    chown -R "$DROP_USER" /Roon/app /Roon/database
-    echo "Ownership alignment complete in $(($(date +%s) - CHOWN_START))s."
-fi
+#
+# Symmetric: also runs when TARGET_USER=0:0, so unsetting PUID/PGID
+# after a prior non-root run reverts ownership cleanly.
+echo "Aligning ownership of /Roon/app and /Roon/database to ${TARGET_USER}..."
+CHOWN_START=$(date +%s)
+chown -R "$TARGET_USER" /Roon/app /Roon/database
+echo "Ownership alignment complete in $(($(date +%s) - CHOWN_START))s."
 
 # --- Final state log --------------------------------------------------------
 # Line format is contract-ish: runtime tests grep for "^Branch: production"
@@ -202,7 +210,7 @@ export HOME
 
 # start.sh handles restarts internally without a full container restart.
 # When PUID/PGID is set, drop to that user via setpriv before exec'ing.
-if [ -n "$DROP_USER" ]; then
+if [ "$DROP_PRIVS" = true ]; then
     exec setpriv --reuid="$PUID" --regid="$PGID" --init-groups -- "${ROON_APP_DIR}/RoonServer/start.sh"
 else
     exec "${ROON_APP_DIR}/RoonServer/start.sh"
