@@ -68,6 +68,22 @@ check "tzdata (zoneinfo available)" \
 check "ca-certificates (HTTPS to download.roonlabs.net)" \
     docker run --rm --entrypoint test "$IMAGE" -f /etc/pki/tls/certs/ca-bundle.crt
 
+# gosu is used by entrypoint.sh to drop privileges to PUID:PGID before
+# exec'ing start.sh. Photon's util-linux ships without setpriv (and no
+# package on Photon provides it), so we install gosu directly. This
+# check catches the case where the gosu download or chmod silently
+# leaves a non-functional binary on disk.
+check "gosu (PUID/PGID privilege drop) is functional" \
+    docker run --rm --entrypoint sh "$IMAGE" -c '/usr/local/bin/gosu --version'
+
+# usermod/groupmod from shadow — used at runtime to align the
+# placeholder roon user/group with the requested PUID/PGID.
+check "usermod (shadow package) is available" \
+    docker run --rm --entrypoint which "$IMAGE" usermod
+
+check "groupmod (shadow package) is available" \
+    docker run --rm --entrypoint which "$IMAGE" groupmod
+
 # ─── Environment hygiene ─────────────────────────────────────────
 
 # ROON_DATAROOT and ROON_ID_DIR are set by entrypoint, not the image

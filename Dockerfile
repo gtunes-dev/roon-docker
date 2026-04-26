@@ -32,15 +32,25 @@ LABEL org.opencontainers.image.licenses="Proprietary"
 #   cifs-utils      — SMB/CIFS network share mounting
 #   ca-certificates — HTTPS for streaming services and cloud APIs
 #   shadow          — usermod/groupmod to align placeholder user with PUID/PGID at runtime
-#   util-linux      — setpriv for privilege drop to PUID:PGID before exec'ing start.sh
 RUN tdnf install -y \
     bash curl tar xz bzip2 tzdata icu \
     alsa-lib freetype2 cifs-utils ca-certificates \
-    shadow util-linux \
+    shadow \
  && (chmod u-s /usr/sbin/mount.cifs 2>/dev/null || true) \
  && tdnf clean all \
  && rm -rf /var/cache/tdnf /var/log/tdnf.log \
            /usr/share/doc /usr/share/man
+
+# gosu provides clean exec-style privilege drop for the PUID/PGID feature.
+# Photon's util-linux is built without setpriv, and no Photon package ships
+# it, so we install gosu directly. Pinned by version; SHA verification could
+# be added later for tamper-evidence (HTTPS to GitHub releases is the current
+# trust anchor).
+ARG GOSU_VERSION=1.17
+RUN curl -fL -o /usr/local/bin/gosu \
+        "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-amd64" \
+ && chmod +x /usr/local/bin/gosu \
+ && /usr/local/bin/gosu --version
 
 # Placeholder user/group for the optional PUID/PGID feature in entrypoint.sh.
 # At runtime, usermod/groupmod adjust these IDs to whatever PUID/PGID requests

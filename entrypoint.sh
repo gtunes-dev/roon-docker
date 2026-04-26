@@ -209,9 +209,12 @@ HOME=/
 export HOME
 
 # start.sh handles restarts internally without a full container restart.
-# When PUID/PGID is set, drop to that user via setpriv before exec'ing.
+# When PUID/PGID is set, drop to that user via gosu before exec'ing.
+# gosu does a clean process replacement (no extra shell wrapper, unlike
+# `su -c`), so PID 1 is start.sh and signals from `docker stop` reach
+# RoonServer directly.
 if [ "$DROP_PRIVS" = true ]; then
-    exec setpriv --reuid="$PUID" --regid="$PGID" --init-groups -- "${ROON_APP_DIR}/RoonServer/start.sh"
+    exec gosu "${PUID}:${PGID}" "${ROON_APP_DIR}/RoonServer/start.sh"
 else
     exec "${ROON_APP_DIR}/RoonServer/start.sh"
 fi
