@@ -32,11 +32,18 @@ LABEL org.opencontainers.image.licenses="Proprietary"
 #   cifs-utils      — SMB/CIFS network share mounting
 #   ca-certificates — HTTPS for streaming services and cloud APIs
 #   shadow          — usermod/groupmod to align placeholder user with PUID/PGID at runtime
+#   traceroute      — Roon spawns traceroute for network diagnostics; the
+#                     toybox symlink at /usr/bin/traceroute can't run as
+#                     non-root (raw socket needs CAP_NET_RAW; can't setcap a
+#                     toybox symlink without granting caps to every toybox
+#                     command). Installing the real package overwrites the
+#                     symlink with a standalone binary we can setcap.
 RUN tdnf install -y \
     bash curl tar xz bzip2 tzdata icu \
     alsa-lib freetype2 cifs-utils ca-certificates \
-    shadow \
+    shadow traceroute \
  && (chmod u-s /usr/sbin/mount.cifs 2>/dev/null || true) \
+ && setcap cap_net_raw+ep /usr/bin/traceroute \
  && tdnf clean all \
  && rm -rf /var/cache/tdnf /var/log/tdnf.log \
            /usr/share/doc /usr/share/man

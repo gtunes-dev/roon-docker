@@ -84,6 +84,16 @@ check "usermod (shadow package) is available" \
 check "groupmod (shadow package) is available" \
     docker run --rm --entrypoint which "$IMAGE" groupmod
 
+# Roon spawns traceroute for network diagnostics. As a non-root user
+# (PUID/PGID), the process inherits no capabilities, so traceroute
+# can't create a raw socket without CAP_NET_RAW being set on the
+# binary itself. Photon's toybox symlink at /usr/bin/traceroute is
+# replaced by the real traceroute package + setcap during build —
+# this check guards against a future package change accidentally
+# replacing the binary without re-applying caps.
+check "traceroute has CAP_NET_RAW for non-root use" \
+    docker run --rm --entrypoint sh "$IMAGE" -c '/usr/sbin/getcap /usr/bin/traceroute | grep -q cap_net_raw'
+
 # ─── Environment hygiene ─────────────────────────────────────────
 
 # ROON_DATAROOT and ROON_ID_DIR are set by entrypoint, not the image
