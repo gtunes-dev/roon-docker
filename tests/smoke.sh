@@ -94,6 +94,19 @@ check "groupmod (shadow package) is available" \
 check "traceroute has CAP_NET_RAW for non-root use" \
     docker run --rm --entrypoint sh "$IMAGE" -c '/usr/sbin/getcap /usr/bin/traceroute | grep -q cap_net_raw'
 
+# Functional companion to the getcap check above. The static check only
+# confirms the cap is set on the binary; this confirms it actually grants
+# raw-socket access at runtime for a non-root caller. Catches regressions
+# getcap would miss: a Docker bounding-set drop of NET_RAW, seccomp
+# tightening, --security-opt=no-new-privileges (which strips file caps on
+# exec), a broken gosu, or a binary that satisfies setcap but won't
+# execute. 127.0.0.1 / -n / -m 1 / -w 2 keep the probe offline-safe and
+# near-instant; traceroute exits non-zero on raw-socket EPERM, so exit
+# code alone is a sufficient signal.
+check "traceroute actually works as non-root (CAP_NET_RAW honored at runtime)" \
+    docker run --rm --entrypoint sh "$IMAGE" -c \
+        'gosu roon traceroute -n -m 1 -w 2 127.0.0.1 >/dev/null'
+
 # ─── Environment hygiene ─────────────────────────────────────────
 
 # ROON_DATAROOT and ROON_ID_DIR are set by entrypoint, not the image
