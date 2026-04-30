@@ -106,6 +106,14 @@ wait_for_install() {
         elapsed=$((elapsed + 5))
         echo "    ... ${elapsed}s"
     done
+    # Diagnostic: VERSION lands ~entry 192 of 562 in the tarball, well
+    # before the rest of the archive is extracted. File checks downstream
+    # (e.g. Server/RoonServer at entry 542) can race tar in progress. If
+    # this sleep resolves the failure, the race is confirmed and we
+    # should switch this poll for `wait_for_log "$CONTAINER" "RoonServer
+    # installed successfully"` — that line is emitted only after tar
+    # returns, making the wait deterministic instead of heuristic.
+    sleep 30
 }
 
 # Wait for a specific branch to appear in the VERSION file's last line.
