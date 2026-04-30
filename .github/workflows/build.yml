@@ -3,8 +3,8 @@ name: Build and Publish
 on:
   workflow_dispatch:
   push:
-    branches: [main]
-    tags: ['v*']
+    branches: [photon]
+    tags: ['photon-v*']
     paths:
       - 'Dockerfile'
       - 'entrypoint.sh'
@@ -36,14 +36,22 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
 
+      # Strip the `photon-` prefix so the docker image tag is pure semver
+      # (e.g. tag `photon-v1.2.3` -> docker tag `1.2.3`). The variant
+      # lives in the image name (roonserver-photon), never in the tag.
+      - name: Extract semver from photon-v* tag
+        id: ver
+        if: startsWith(github.ref, 'refs/tags/photon-v')
+        run: echo "value=${GITHUB_REF#refs/tags/photon-}" >> "$GITHUB_OUTPUT"
+
       - name: Generate tags
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=semver,pattern={{version}}
-            type=raw,value=latest,enable=${{ !contains(github.ref, '-') }}
+            type=semver,pattern={{version}},value=${{ steps.ver.outputs.value }},enable=${{ steps.ver.outputs.value != '' }}
+            type=raw,value=latest,enable=${{ steps.ver.outputs.value != '' && !contains(steps.ver.outputs.value, '-') }}
 
       - name: Build image
         uses: docker/build-push-action@v6
@@ -66,11 +74,11 @@ jobs:
         run: ./tests/runtime.sh roonserver:test
 
       - name: Save tested image
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/photon-v')
         run: docker save roonserver:test -o /tmp/roonserver.tar
 
       - name: Upload tested image
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/photon-v')
         uses: actions/upload-artifact@v4
         with:
           name: roonserver-image
@@ -78,7 +86,7 @@ jobs:
           retention-days: 1
 
   publish:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/photon-v')
     needs: [build]
     runs-on: ubuntu-latest
     steps:
@@ -91,14 +99,20 @@ jobs:
       - name: Load tested image
         run: docker load -i /tmp/roonserver.tar
 
+      # Same prefix-strip as in the build job; this job only runs on
+      # photon-v* tags so the extract always produces a value here.
+      - name: Extract semver from photon-v* tag
+        id: ver
+        run: echo "value=${GITHUB_REF#refs/tags/photon-}" >> "$GITHUB_OUTPUT"
+
       - name: Generate tags
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=semver,pattern={{version}}
-            type=raw,value=latest,enable=${{ !contains(github.ref, '-') }}
+            type=semver,pattern={{version}},value=${{ steps.ver.outputs.value }}
+            type=raw,value=latest,enable=${{ !contains(steps.ver.outputs.value, '-') }}
 
       - uses: docker/login-action@v3
         with:
