@@ -3,7 +3,7 @@ name: Build and Publish
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [debian]
     tags: ['v*']
     paths:
       - 'Dockerfile'
@@ -23,7 +23,7 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: roonlabs/roonserver
+  IMAGE_NAME: gtunes-dev/roonserver
 
 jobs:
   build:

@@ -1,16 +1,16 @@
-# RoonServer Docker Image
+# RoonServer Docker Image (Debian fork)
 
-Official Docker image for [RoonServer](https://roon.app).
+Personal fork of [RoonLabs/roon-docker](https://github.com/RoonLabs/roon-docker) that builds [RoonServer](https://roon.app) on a Debian Trixie base, with optional PUID/PGID support for non-root operation.
 
 ```
-ghcr.io/roonlabs/roonserver
+ghcr.io/gtunes-dev/roonserver
 ```
 
 > **Note:** This image is **amd64 (x86_64) only**. ARM-based devices (Raspberry Pi, ARM NAS models like Synology J-series) are not supported.
 
 ## Quick Start
 
-Use the **[Docker Setup Guide](https://roonlabs.github.io/roon-docker/)** to generate a `docker run` or `docker compose` command tailored to your system.
+Use the **[Docker Setup Guide](https://gtunes-dev.github.io/roon-docker/)** to generate a `docker run` or `docker compose` command tailored to your system (the guide is specific to this fork and references `ghcr.io/gtunes-dev/roonserver`).
 
 On first start, the container downloads and installs RoonServer automatically. Subsequent starts skip the download and launch immediately.
 
@@ -44,7 +44,7 @@ Set the `TZ` environment variable to your [timezone](https://en.wikipedia.org/wi
 - Your Roon data and settings will not persist across container restarts
 - Your Roon install must be re-authorized on each start
 
-> **⚠ NAS warning — host paths outside your platform's persistent prefix can silently be tmpfs.** Several NAS OSes run the host root filesystem in RAM and only expose persistent storage under a specific prefix — typically `/share/...` on QNAP, `/volume1/...` on Synology, `/mnt/user/...` on Unraid, `/mnt/<pool>/...` on TrueNAS SCALE. Binding a host path **outside** that prefix (e.g. `/opt/roon` on QNAP) will appear to work: Docker creates the missing directory, the container starts, Roon imports a library — and then a reboot wipes it because the directory only ever lived in RAM. Always mount under your platform's persistent prefix. The [setup generator](https://roonlabs.github.io/roon-docker/) flags paths that don't match the selected platform's prefix.
+> **⚠ NAS warning — host paths outside your platform's persistent prefix can silently be tmpfs.** Several NAS OSes run the host root filesystem in RAM and only expose persistent storage under a specific prefix — typically `/share/...` on QNAP, `/volume1/...` on Synology, `/mnt/user/...` on Unraid, `/mnt/<pool>/...` on TrueNAS SCALE. Binding a host path **outside** that prefix (e.g. `/opt/roon` on QNAP) will appear to work: Docker creates the missing directory, the container starts, Roon imports a library — and then a reboot wipes it because the directory only ever lived in RAM. Always mount under your platform's persistent prefix. The [setup generator](https://gtunes-dev.github.io/roon-docker/) flags paths that don't match the selected platform's prefix.
 
 Mount your **primary** music location directly at `/Music` (e.g. `-v /path/to/music:/Music`). This folder will be treated as the Default Music Folder by Roon. All drag-and-drop content will be added there.
 
@@ -71,7 +71,7 @@ All RoonServer state and binaries are persisted to the `/Roon` volume. Recreatin
 To update on demand:
 
 ```
-docker pull ghcr.io/roonlabs/roonserver:latest
+docker pull ghcr.io/gtunes-dev/roonserver:latest
 docker rm -f roonserver
 # re-run your docker run command or: docker compose up -d
 ```

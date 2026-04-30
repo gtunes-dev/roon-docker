@@ -10,6 +10,52 @@ IMAGE_VERSION="$(cat /etc/roon-image-version 2>/dev/null || echo 'unknown')"
 
 echo "Roon Docker image ${IMAGE_VERSION} starting."
 
+# --- Privilege model -------------------------------------------------------
+#
+# This image uses the PUID/PGID convention for non-root operation. The
+# Docker-native --user / user: flag is not supported because the entrypoint
+# needs to start as root in order to chown its managed subdirs and drop
+# privileges via setpriv. Forcing user: "0:0" (e.g., for TrueNAS) is fine —
+# it still starts the container as root.
+#
+# Defaults (PUID=0, PGID=0) preserve the pre-PUID/PGID behavior (run as
+# root). Override via env vars to drop to a different UID/GID.
+
+if [ "$(id -u)" != "0" ]; then
+    echo "Error: this image must start as root."
+    echo "       Detected non-root startup (--user / user: was set to a non-root value)."
+    echo "       Remove --user / user: and use PUID/PGID env vars instead."
+    echo "         e.g.  -e PUID=1000 -e PGID=1000"
+    exit 1
+fi
+
+# If only one of PUID/PGID is supplied, default the missing one to match.
+# Most PUID/PGID images treat the pair as joined; setting just PUID=1000
+# would otherwise silently leave the group at 0 (root group), which is
+# almost never what the user wants.
+if [ -n "${PUID-}" ] && [ -z "${PGID-}" ]; then
+    PGID="$PUID"
+elif [ -n "${PGID-}" ] && [ -z "${PUID-}" ]; then
+    PUID="$PGID"
+fi
+PUID="${PUID:-0}"
+PGID="${PGID:-0}"
+
+# Target ownership for the managed subdirs is always set. This makes
+# ownership tracking symmetric: unsetting PUID/PGID after a prior
+# non-root run cleanly reverts /Roon/app and /Roon/database back to
+# root, instead of leaving them stranded under a UID that no longer
+# matches the running process.
+TARGET_USER="${PUID}:${PGID}"
+
+DROP_PRIVS=false
+if [ "$PUID" != "0" ] || [ "$PGID" != "0" ]; then
+    groupmod -o -g "$PGID" roon
+    usermod  -o -u "$PUID" -g "$PGID" roon
+    DROP_PRIVS=true
+    echo "PUID/PGID set; will switch to ${TARGET_USER} before launching RoonServer."
+fi
+
 # Verify /Roon is mounted and writable
 if test ! -w /Roon; then
     echo "Error: The /Roon directory is not writable."
@@ -119,6 +165,24 @@ if [ "$NEEDS_INSTALL" = true ]; then
     echo "RoonServer installed successfully."
 fi
 
+# Align ownership of the dirs we manage to the running user — always.
+# Done after install so files extracted by tar in this run are also
+# captured. /Roon, /Music, and /RoonBackups themselves are the user's
+# responsibility — only /Roon/app and /Roon/database (and their
+# contents) are chown'd here.
+#
+# Always recursive (no skip-if-already-correct shortcut): a self-update
+# or partial extraction can leave files with mixed ownership that a
+# top-level stat check would miss. Wall time is logged so users with
+# very large databases can see the cost in their startup logs.
+#
+# Symmetric: also runs when TARGET_USER=0:0, so unsetting PUID/PGID
+# after a prior non-root run reverts ownership cleanly.
+echo "Aligning ownership of /Roon/app and /Roon/database to ${TARGET_USER}..."
+CHOWN_START=$(date +%s)
+chown -R "$TARGET_USER" /Roon/app /Roon/database
+echo "Ownership alignment complete in $(($(date +%s) - CHOWN_START))s."
+
 # --- Final state log --------------------------------------------------------
 # Line format is contract-ish: runtime tests grep for "^Branch: production"
 # and "^Branch: earlyaccess". Don't change the prefix or spacing without
@@ -144,5 +208,16 @@ export ROON_DEFAULT_MUSIC_FOLDER_WATCH_PATH
 HOME=/
 export HOME
 
-# start.sh handles restarts internally without a full container restart
-exec "${ROON_APP_DIR}/RoonServer/start.sh"
+# start.sh handles restarts internally without a full container restart.
+# When PUID/PGID is set, drop to that user via setpriv before exec'ing.
+# setpriv from util-linux is in the debian-slim base; no extra install
+# needed. --clear-groups drops supplementary groups so the dropped
+# process inherits only the requested PGID as its sole group, matching
+# the gosu/setuid model. setpriv exec's directly (no shell wrapper), so
+# PID 1 is start.sh and signals from `docker stop` reach RoonServer.
+if [ "$DROP_PRIVS" = true ]; then
+    exec setpriv --reuid "$PUID" --regid "$PGID" --clear-groups \
+                 "${ROON_APP_DIR}/RoonServer/start.sh"
+else
+    exec "${ROON_APP_DIR}/RoonServer/start.sh"
+fi

@@ -68,6 +68,25 @@ check "tzdata (zoneinfo available)" \
 check "ca-certificates (HTTPS to download.roonlabs.net)" \
     docker run --rm --entrypoint test "$IMAGE" -f /etc/ssl/certs/ca-certificates.crt
 
+# ─── PUID/PGID feature dependencies ──────────────────────────────
+# entrypoint.sh uses setpriv (util-linux) to drop privileges and
+# usermod/groupmod (passwd) to align the placeholder roon user with
+# the requested PUID/PGID. Both packages are essential in the
+# debian-slim base, so these checks guard against future base-image
+# slimming that drops them.
+
+check "setpriv (PUID/PGID privilege drop) is functional" \
+    docker run --rm --entrypoint sh "$IMAGE" -c '/usr/bin/setpriv --help >/dev/null'
+
+check "usermod (passwd package) is available" \
+    docker run --rm --entrypoint which "$IMAGE" usermod
+
+check "groupmod (passwd package) is available" \
+    docker run --rm --entrypoint which "$IMAGE" groupmod
+
+check "placeholder roon user exists" \
+    docker run --rm --entrypoint id "$IMAGE" roon
+
 # ─── Environment hygiene ─────────────────────────────────────────
 
 # ROON_DATAROOT and ROON_ID_DIR are set by entrypoint, not the image

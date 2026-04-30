@@ -7,11 +7,11 @@ ARG GIT_SHA=unknown
 ARG BUILD_DATE=unknown
 
 LABEL org.opencontainers.image.title="RoonServer"
-LABEL org.opencontainers.image.authors="Roon Labs"
-LABEL org.opencontainers.image.vendor="Roon Labs"
+LABEL org.opencontainers.image.authors="gTunesDev"
+LABEL org.opencontainers.image.vendor="gTunesDev"
 LABEL org.opencontainers.image.version="${VERSION}"
-LABEL org.opencontainers.image.description="Official RoonServer Docker Image"
-LABEL org.opencontainers.image.source="https://github.com/RoonLabs/roon-docker"
+LABEL org.opencontainers.image.description="RoonServer Docker image — Debian Trixie base. Personal fork of RoonLabs/roon-docker."
+LABEL org.opencontainers.image.source="https://github.com/gtunes-dev/roon-docker"
 LABEL org.opencontainers.image.revision="${GIT_SHA}"
 LABEL org.opencontainers.image.created="${BUILD_DATE}"
 LABEL org.opencontainers.image.url="https://roon.app"
@@ -26,14 +26,27 @@ LABEL org.opencontainers.image.licenses="Proprietary"
 #   libfreetype6    — provides libfreetype.so.6 soname that bundled libharfbuzz links against
 #   cifs-utils      — SMB/CIFS network share mounting
 #   ca-certificates — HTTPS for streaming services and cloud APIs
+#   traceroute      — Roon spawns traceroute for network diagnostics. The
+#                     Debian package's traceroute.db binary is SUID root,
+#                     so non-root callers (PUID/PGID) can use it without
+#                     extra capability handling.
+# usermod/groupmod (passwd package) and setpriv (util-linux) are already
+# present in the debian:trixie-slim base, so no install is needed for the
+# PUID/PGID feature beyond the placeholder user/group created below.
 RUN apt-get update \
  && apt-get -y install --no-install-recommends \
     bash curl xz-utils bzip2 tzdata libicu76 \
     libasound2t64 libfreetype6 cifs-utils ca-certificates \
+    traceroute \
  && (chmod u-s /usr/sbin/mount.cifs 2>/dev/null || true) \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/* /var/log/apt /var/log/dpkg.log \
            /usr/share/doc /usr/share/man
+
+# Placeholder user/group for the optional PUID/PGID feature in entrypoint.sh.
+# At runtime, usermod/groupmod adjust these IDs to whatever PUID/PGID requests
+# (or this user stays unused if PUID/PGID is unset and the container runs as root).
+RUN groupadd -r roon && useradd -r -g roon -d /Roon -s /bin/bash -N roon
 
 RUN curl -L -o /tmp/ffmpeg.tar.xz https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz \
  && tar xf /tmp/ffmpeg.tar.xz --wildcards -C /tmp "ffmpeg*/ffmpeg" \

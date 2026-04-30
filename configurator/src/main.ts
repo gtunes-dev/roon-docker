@@ -12,7 +12,7 @@ import {
 } from './options';
 import type { Branch, Config, ExtraVolume, PlatformMap, ValidationIssue } from './types';
 
-const IMAGE = 'ghcr.io/roonlabs/roonserver:latest';
+const IMAGE = 'ghcr.io/gtunes-dev/roonserver:latest';
 
 type Tab = 'compose' | 'run';
 let currentTab: Tab = 'compose';
