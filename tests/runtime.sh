@@ -89,31 +89,20 @@ check() {
     fi
 }
 
-# Wait for VERSION file to appear (indicates RoonServer install complete).
-# Returns non-zero on timeout so set -e halts the run — a download that
-# never completes is a test failure, not something to silently continue past.
+# Wait for RoonServer install to complete. Polls the entrypoint's
+# "RoonServer installed successfully." log line, which is emitted only
+# after tar returns — so the whole archive is on disk by the time we
+# see it. (We previously polled the VERSION file, but VERSION lands
+# mid-tar around entry 192 of 562; downstream file checks could race
+# late-archive entries like Server/RoonServer at entry 542.)
+#
+# Uses the caller's $CONTAINER global; the `dir` argument is kept
+# for signature stability and is unused. Returns non-zero on timeout.
 wait_for_install() {
     local dir="$1"
     local timeout="${2:-180}"
-    local elapsed=0
-    echo "    Waiting for RoonServer download..."
-    while [ ! -f "$dir/app/RoonServer/VERSION" ]; do
-        if [ "$elapsed" -ge "$timeout" ]; then
-            echo "    wait_for_install: timed out after ${timeout}s waiting for $dir/app/RoonServer/VERSION" >&2
-            return 1
-        fi
-        sleep 5
-        elapsed=$((elapsed + 5))
-        echo "    ... ${elapsed}s"
-    done
-    # Diagnostic: VERSION lands ~entry 192 of 562 in the tarball, well
-    # before the rest of the archive is extracted. File checks downstream
-    # (e.g. Server/RoonServer at entry 542) can race tar in progress. If
-    # this sleep resolves the failure, the race is confirmed and we
-    # should switch this poll for `wait_for_log "$CONTAINER" "RoonServer
-    # installed successfully"` — that line is emitted only after tar
-    # returns, making the wait deterministic instead of heuristic.
-    sleep 30
+    echo "    Waiting for RoonServer install to complete..."
+    wait_for_log "$CONTAINER" "RoonServer installed successfully" "$timeout"
 }
 
 # Wait for a specific branch to appear in the VERSION file's last line.
