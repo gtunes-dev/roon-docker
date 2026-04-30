@@ -2,14 +2,23 @@ name: Build and Publish
 
 on:
   workflow_dispatch:
-  push:
-    branches: [photon]
-    tags: ['photon-v*']
-    paths:
-      - 'Dockerfile'
-      - 'entrypoint.sh'
-      - 'tests/**'
-      - '.github/workflows/build.yml'
+  # ─── Auto-publish disabled ────────────────────────────────────────────
+  # Photon publishing is paused while the debian branch is the canonical
+  # fork. The push triggers below are commented out so pushing to photon
+  # or tagging photon-v* no longer builds and publishes a docker image.
+  # Pull-request validation (further down) still runs — PRs against
+  # photon are built and smoke/runtime-tested, they just aren't pushed
+  # to GHCR. To re-enable photon auto-publishing in the future, either
+  # uncomment the block below or `git revert` the commit that introduced
+  # this comment.
+  # push:
+  #   branches: [photon]
+  #   tags: ['photon-v*']
+  #   paths:
+  #     - 'Dockerfile'
+  #     - 'entrypoint.sh'
+  #     - 'tests/**'
+  #     - '.github/workflows/build.yml'
   pull_request:
     paths:
       - 'Dockerfile'

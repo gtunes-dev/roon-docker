@@ -1,11 +1,19 @@
 name: Deploy Configurator to Pages
 
 on:
-  push:
-    branches: [photon]
-    paths:
-      - 'configurator/**'
-      - '.github/workflows/pages.yml'
+  # ─── Auto-deploy disabled ─────────────────────────────────────────────
+  # The configurator now deploys from the debian branch — only one branch
+  # can own the live Pages site, and debian is the canonical fork. The
+  # push trigger below is commented out so pushing to photon no longer
+  # races debian for the deploy slot. Pull-request validation still runs
+  # on photon PRs (build + tests, no deploy). To re-enable photon as the
+  # deploy source, uncomment the block below or `git revert` the commit
+  # that introduced this comment.
+  # push:
+  #   branches: [photon]
+  #   paths:
+  #     - 'configurator/**'
+  #     - '.github/workflows/pages.yml'
   pull_request:
     paths:
       - 'configurator/**'
