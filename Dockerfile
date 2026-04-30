@@ -26,10 +26,6 @@ LABEL org.opencontainers.image.licenses="Proprietary"
 #   libfreetype6    — provides libfreetype.so.6 soname that bundled libharfbuzz links against
 #   cifs-utils      — SMB/CIFS network share mounting
 #   ca-certificates — HTTPS for streaming services and cloud APIs
-#   traceroute      — Roon spawns traceroute for network diagnostics. The
-#                     Debian package's traceroute.db binary is SUID root,
-#                     so non-root callers (PUID/PGID) can use it without
-#                     extra capability handling.
 # usermod/groupmod (passwd package) and setpriv (util-linux) are already
 # present in the debian:trixie-slim base, so no install is needed for the
 # PUID/PGID feature beyond the placeholder user/group created below.
@@ -37,7 +33,6 @@ RUN apt-get update \
  && apt-get -y install --no-install-recommends \
     bash curl xz-utils bzip2 tzdata libicu76 \
     libasound2t64 libfreetype6 cifs-utils ca-certificates \
-    traceroute \
  && (chmod u-s /usr/sbin/mount.cifs 2>/dev/null || true) \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/* /var/log/apt /var/log/dpkg.log \
