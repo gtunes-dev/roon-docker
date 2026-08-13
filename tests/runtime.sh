@@ -89,18 +89,11 @@ check() {
     fi
 }
 
-# Wait for RoonServer install to complete. Polls the entrypoint's
-# "RoonServer installed successfully." log line, which is emitted only
-# after tar returns — so the whole archive is on disk by the time we
-# see it. (We previously polled the VERSION file, but VERSION lands
-# mid-tar around entry 192 of 562; downstream file checks could race
-# late-archive entries like Server/RoonServer at entry 542.)
-#
-# Uses the caller's $CONTAINER global; the `dir` argument is kept
-# for signature stability and is unused. Returns non-zero on timeout.
+# Wait for RoonServer install to complete.
+# Returns non-zero on timeout so set -e halts the run — a download that
+# never completes is a test failure, not something to silently continue past.
 wait_for_install() {
-    local dir="$1"
-    local timeout="${2:-180}"
+    local timeout="${1:-180}"
     echo "    Waiting for RoonServer install to complete..."
     wait_for_log "$CONTAINER" "RoonServer installed successfully" "$timeout"
 }
@@ -192,7 +185,7 @@ echo "    Temp dir: $ROON_DIR"
 
 start_container "$CONTAINER" "$ROON_DIR"
 
-wait_for_install "$ROON_DIR"
+wait_for_install
 
 check "VERSION file created" \
     test -f "$ROON_DIR/app/RoonServer/VERSION"
@@ -212,8 +205,13 @@ check "start.sh exists" \
 check "Server/RoonServer launcher exists" \
     test -f "$ROON_DIR/app/RoonServer/Server/RoonServer"
 
-check "RoonDotnet runtime exists" \
-    test -d "$ROON_DIR/app/RoonServer/RoonDotnet"
+# The .NET runtime used to sit in a shared RoonDotnet/ directory. 2.71 b1683
+# made the head self-contained, so the runtime now ships beside it under
+# Server/ and RoonDotnet/ is gone — this asserted a path that no longer exists
+# and had been failing since the repackaging. Pin the runtime where it actually
+# lives, so a future move fails here loudly rather than silently passing.
+check "dotnet runtime ships with the Server head" \
+    test -f "$ROON_DIR/app/RoonServer/Server/libcoreclr.so"
 
 
 wait_for_log "$CONTAINER" "^Branch: production"
@@ -234,10 +232,11 @@ check "logs contain roon version" \
 # Record production version for later comparison
 PROD_VERSION=$(sed -n '2p' "$ROON_DIR/app/RoonServer/VERSION" 2>/dev/null || echo "")
 
-# HEALTHCHECK happy path — with RoonServer.dll running, the grep-based
-# healthcheck in Dockerfile should flip to "healthy" once start_period
-# elapses (120s) plus one interval (30s). Budget 240s total.
-check "HEALTHCHECK reports 'healthy' when RoonServer.dll is running" \
+# HEALTHCHECK happy path — against a real install the probe should flip to
+# "healthy" once start_period elapses (120s) plus one interval (30s). Budget
+# 240s total. Covers the Docker wiring; per-package-layout probe behaviour is
+# pinned in healthcheck.sh.
+check "HEALTHCHECK reports 'healthy' against a real install" \
     wait_for_health "$CONTAINER" healthy 240
 
 echo "    Testing clean shutdown..."
@@ -258,7 +257,7 @@ echo "    Temp dir: $ROON_DIR"
 
 start_container "$CONTAINER" "$ROON_DIR" -e ROON_INSTALL_BRANCH=earlyaccess
 
-wait_for_install "$ROON_DIR"
+wait_for_install
 
 check "fresh EA: VERSION file created" \
     test -f "$ROON_DIR/app/RoonServer/VERSION"
@@ -289,7 +288,7 @@ echo "    Temp dir: $ROON_DIR"
 
 # First: install production (no env var → default)
 start_container "$CONTAINER" "$ROON_DIR"
-wait_for_install "$ROON_DIR"
+wait_for_install
 docker stop -t 10 "$CONTAINER" 2>/dev/null || true
 docker rm -f "$CONTAINER" 2>/dev/null || true
 
@@ -341,7 +340,7 @@ echo "    Temp dir: $ROON_DIR"
 
 # First: install earlyaccess
 start_container "$CONTAINER" "$ROON_DIR" -e ROON_INSTALL_BRANCH=earlyaccess
-wait_for_install "$ROON_DIR"
+wait_for_install
 docker stop -t 10 "$CONTAINER" 2>/dev/null || true
 docker rm -f "$CONTAINER" 2>/dev/null || true
 
@@ -377,7 +376,7 @@ echo "    Temp dir: $ROON_DIR"
 
 # Install production first
 start_container "$CONTAINER" "$ROON_DIR"
-wait_for_install "$ROON_DIR"
+wait_for_install
 docker stop -t 10 "$CONTAINER" 2>/dev/null || true
 docker rm -f "$CONTAINER" 2>/dev/null || true
 
@@ -435,7 +434,7 @@ echo "    Temp dir: $ROON_DIR"
 
 # Install EA first
 start_container "$CONTAINER" "$ROON_DIR" -e ROON_INSTALL_BRANCH=earlyaccess
-wait_for_install "$ROON_DIR"
+wait_for_install
 docker stop -t 10 "$CONTAINER" 2>/dev/null || true
 docker rm -f "$CONTAINER" 2>/dev/null || true
 
@@ -479,7 +478,7 @@ PROD_URL="https://download.roonlabs.net/builds/production/RoonServer_linuxx64.ta
 start_container "$CONTAINER" "$ROON_DIR" \
     -e ROON_INSTALL_BRANCH=earlyaccess \
     -e ROON_DOWNLOAD_URL="$PROD_URL"
-wait_for_install "$ROON_DIR"
+wait_for_install
 wait_for_log "$CONTAINER" "^Branch: production"
 docker logs "$CONTAINER" > "$ROON_DIR/url-override-fresh.log" 2>&1 || true
 
@@ -517,14 +516,15 @@ docker stop -t 10 "$CONTAINER" 2>/dev/null || true
 
 # ─── HEALTHCHECK unhealthy path ──────────────────────────────────
 #
-# Verify the HEALTHCHECK defined in Dockerfile actually flips to
-# "unhealthy" when RoonServer.dll is not running. Without this test,
-# a broken grep pattern (e.g., someone silently changing the filename)
-# would leave containers reporting "healthy" even after Roon crashed.
+# Verify the HEALTHCHECK defined in Dockerfile actually flips a container
+# to "unhealthy" at all.
 #
-# Start with `--entrypoint sleep` so RoonServer.dll never runs but the
+# Start with `--entrypoint sleep` so RoonServer never runs but the
 # HEALTHCHECK directive still applies. After start_period (120s) +
 # 3 × interval (30s each) = 210s, status should be "unhealthy".
+#
+# Weak as a test of the probe itself — nothing here references the install
+# path — so "supervisor alive, head gone" lives in healthcheck.sh instead.
 
 echo ""
 echo "=== Runtime tests (HEALTHCHECK unhealthy path): $IMAGE ==="
@@ -537,7 +537,7 @@ docker run -d --name "$CONTAINER" \
     "$IMAGE" infinity >/dev/null
 
 # Give it up to 4 minutes: start_period 120s + 3 × 30s retries + margin.
-check "HEALTHCHECK reports 'unhealthy' when RoonServer.dll is absent" \
+check "HEALTHCHECK reports 'unhealthy' when nothing is running" \
     wait_for_health "$CONTAINER" unhealthy 240
 
 docker stop -t 5 "$CONTAINER" 2>/dev/null || true

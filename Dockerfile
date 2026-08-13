@@ -26,13 +26,14 @@ LABEL org.opencontainers.image.licenses="Proprietary"
 #   libfreetype6    — provides libfreetype.so.6 soname that bundled libharfbuzz links against
 #   cifs-utils      — SMB/CIFS network share mounting
 #   ca-certificates — HTTPS for streaming services and cloud APIs
+#   procps          — provides ps, required by RoonServer's self-update script
 # usermod/groupmod (passwd package) and setpriv (util-linux) are already
 # present in the debian:trixie-slim base, so no install is needed for the
 # PUID/PGID feature beyond the placeholder user/group created below.
 RUN apt-get update \
  && apt-get -y install --no-install-recommends \
     bash curl xz-utils bzip2 tzdata libicu76 \
-    libasound2t64 libfreetype6 cifs-utils ca-certificates \
+    libasound2t64 libfreetype6 cifs-utils ca-certificates procps \
  && (chmod u-s /usr/sbin/mount.cifs 2>/dev/null || true) \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/* /var/log/apt /var/log/dpkg.log \
@@ -57,9 +58,25 @@ EXPOSE 9003/udp 9100-9200/tcp 9200-9250/tcp 9330-9339/tcp 55000/tcp
 
 VOLUME /Roon /RoonBackups /Music
 
-# Healthcheck uses /proc directly instead of pgrep to avoid procps dependency
+# Healthcheck reads /proc directly rather than parsing ps/pgrep output. (procps
+# is installed above for RoonServer's self-update; the probe just doesn't need it.)
+#
+# Two branches, because the head's name depends on the package. Current builds
+# exec it via Server/.roonhost/RoonServer, so it is identifiable only by comm
+# ("RoonServer", no extension); legacy shared-runtime builds exec dotnet with
+# RoonServer.dll as an argument, where comm is just "dotnet".
+#
+# comm is a bare basename, so -x anchors it against a decoy like
+# "RoonServerOld"; the cmdline branch instead relies on the "[R]" trick, since
+# the probe's own shell carries this directive in its argv and would otherwise
+# match itself. A comm hit must also carry a non-empty cmdline: the kernel keeps
+# comm for a defunct process but empties cmdline, so matching comm alone reports
+# a zombie head as healthy forever. tests/healthcheck.sh pins each of these.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
-    CMD grep -ql '[R]oonServer.dll' /proc/[0-9]*/cmdline 2>/dev/null || exit 1
+    CMD { for f in $(grep -lxE 'RoonServer(\.exe|\.dll)?' /proc/[0-9]*/comm 2>/dev/null); do \
+            [ -n "$(cat "${f%comm}cmdline" 2>/dev/null)" ] && exit 0; \
+          done; \
+          grep -qlE '[R]oonServer\.(dll|exe)' /proc/[0-9]*/cmdline 2>/dev/null; } || exit 1
 
 # entrypoint.sh downloads RoonServer on first run (to /Roon/app), then
 # exec's into start.sh — the stock bash launcher that handles
