@@ -54,6 +54,8 @@ if [ "$PUID" != "0" ] || [ "$PGID" != "0" ]; then
     usermod  -o -u "$PUID" -g "$PGID" roon
     DROP_PRIVS=true
     echo "PUID/PGID set; will switch to ${TARGET_USER} before launching RoonServer."
+else
+    echo "PUID/PGID not set (or set to 0); RoonServer will run as root."
 fi
 
 # Verify /Roon is mounted and writable
@@ -213,11 +215,16 @@ export HOME
 # setpriv from util-linux is in the debian-slim base; no extra install
 # needed. --clear-groups drops supplementary groups so the dropped
 # process inherits only the requested PGID as its sole group, matching
-# the gosu/setuid model. setpriv exec's directly (no shell wrapper), so
-# PID 1 is start.sh and signals from `docker stop` reach RoonServer.
+# the gosu/setuid model.
+#
+# The bash -c wrapper runs *after* the privilege drop: it logs the
+# identity the process actually ended up with (not just the intent
+# logged above), then exec's start.sh — so PID 1 remains start.sh and
+# signals from `docker stop` still reach RoonServer.
 if [ "$DROP_PRIVS" = true ]; then
     exec setpriv --reuid "$PUID" --regid "$PGID" --clear-groups \
-                 "${ROON_APP_DIR}/RoonServer/start.sh"
+         bash -c 'echo "Privilege drop complete: running as uid=$(id -u) gid=$(id -g) ($(id -un))."; exec "$1"' \
+         bash "${ROON_APP_DIR}/RoonServer/start.sh"
 else
     exec "${ROON_APP_DIR}/RoonServer/start.sh"
 fi
